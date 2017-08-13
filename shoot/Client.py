@@ -1,28 +1,65 @@
-import subprocess as proc
+import pexpect as proc
+import time
 
-Dir_p1 = "../../CNN.py"
-Dir_p2 = "../../CNN2.py"
-Dir_GM = "Shoot_game"
+Dir_GM = "java Shoot_game"
+Dir_p1 = "python ../../CNN.py"
+Dir_p2 = "python ../../CNN2.py"
 
-p1 = proc.Popen(["python",Dir_p1],stdin=proc.PIPE,stdout=proc.PIPE)
-p2 = proc.Popen(["python",Dir_p2],stdin=proc.PIPE,stdout=proc.PIPE)
-GM = proc.Popen(["java", Shoot_game],stdin=proc.PIPE,stdout=proc.PIPE)
+GM = proc.spawn(Dir_GM, logfile=None)
+p1 = proc.spawn(Dir_p1, logfile=None)
+p2 = proc.spawn(Dir_p2, logfile=None)
+Log = open("Log_Client.txt", "w")
+step = 0
+training_iters = 200000
 
-while True:
-    # Get image from java
-    Image = GM.stdin.readline()
-    # Give image to players
-    p1.stdin.write(Image)
-    p2.stdin.write(Image)
-    # Get action from players
-    move1 = p1.stdout.readline()
-    move2 = p2.stdout.readline()
-    # Do action in game
-    GM.stdin.write(move1)
-    GM.stdin.write(move2)
-    # Get result
-    point1 = GM.stdin.readline()
-    point2 = GM.stdin.readline()
-    # Send result to player
-    p1.stdin.write(point1)
-    p2.stdin.write(point2)
+print("Waiting for CNN Files...")
+time.sleep(4)
+
+def write_log(S):
+    Log = open("Log_Client.txt", "a")
+    Log.write(S+"\n")
+    Log.close()
+
+def get_input(P, S):
+    P.sendline("CX")
+    P.expect(S)
+    F = open("Msg.txt", "r")
+    Msg = F.readline().rstrip('\n')
+    F.close()
+    if len(Msg)>10: write_log("Recieved message length of "+str(len(Msg)))
+    else : write_log("Recieved message : " + Msg)
+    return Msg
+
+def print_out(P, Msg):
+    F = open("Msg.txt", "w")
+    F.write(Msg+"\n")
+    F.close()
+    if len(Msg)>10 : write_log("Sent message length of "+str(len(Msg)))
+    else : write_log("Sent message : " + Msg)
+    P.sendline("CX")
+    time.sleep(0.05)
+
+print_out(GM, str(training_iters))
+print_out(p1, str(training_iters))
+print_out(p2, str(training_iters))
+
+while step < training_iters:
+    print("Step "+str(step)+" started")
+    Image = get_input(GM, "0X")
+    print("Received image length of " + str(len(Image)))
+    print_out(p1, Image)
+    print_out(p2, Image)
+    print("Sent Image")
+    A1 = get_input(p1, "1X")
+    A2 = get_input(p2, "2X")
+    print("Received action : "+A1+", "+A2)
+    print_out(GM, A1)
+    print_out(GM, A2)
+    print("Sent action")
+    Point1 = get_input(GM, "0X")
+    Point2 = get_input(GM, "0X")
+    print("Received Point1 : "+Point1)
+    print("Received Point2 : "+Point2)
+    print_out(p1, Point1)
+    print_out(p2, Point2)
+    step = step + 1
